@@ -1,7 +1,8 @@
 {
   "functions": {
     "api/generate-client-prep.ts": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "prompts/**"
     }
   }
 }
