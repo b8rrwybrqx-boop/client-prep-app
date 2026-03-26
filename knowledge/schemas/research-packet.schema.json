@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Research Packet",
+  "type": "object",
+  "required": [
+    "input",
+    "companyFacts",
+    "brands",
+    "mna",
+    "attendeeFacts",
+    "tpgRelevance",
+    "verificationSummary"
+  ],
+  "properties": {
+    "input": {
+      "type": "object",
+      "required": ["company", "attendees", "meetingObjective", "notes"],
+      "properties": {
+        "company": {
+          "type": "string"
+        },
+        "attendees": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "meetingObjective": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "companyFacts": {
+      "type": "object"
+    },
+    "brands": {
+      "type": "object"
+    },
+    "mna": {
+      "type": "object"
+    },
+    "attendeeFacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "notes", "sourceChecks"],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "verifiedTitle": {
+            "type": ["string", "null"]
+          },
+          "verifiedRole": {
+            "type": ["string", "null"]
+          },
+          "background": {
+            "type": ["string", "null"]
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": ["company-page", "company-news", "secondary-profile", "inferred", "not-found"]
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          },
+          "note": {
+            "type": ["string", "null"]
+          },
+          "inferredPriorities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "title": {
+            "type": "string"
+          },
+          "verificationLevel": {
+            "type": "string",
+            "enum": ["company-site", "secondary-public-profile", "unverified"]
+          },
+          "titleEvidence": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sourceChecks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "latestDevelopments": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "leadershipChanges": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "strategicSignals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "keyConstraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "concentrationRisks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "proofPoints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "portfolioChanges": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "restructuringSignals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "governanceSignals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tpgRelevance": {
+      "type": "object"
+    },
+    "verificationSummary": {
+      "type": "object",
+      "required": ["checksPerformed", "limitations", "assumptions"],
+      "properties": {
+        "checksPerformed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

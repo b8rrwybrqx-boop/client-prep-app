@@ -1,0 +1,15 @@
+{
+  "name": "tpg-client-prep-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "rm -rf dist public && tsc && mkdir -p dist/app/web dist/prompts/examples dist/knowledge/tpg dist/knowledge/schemas dist/data/test-inputs dist/data/test-outputs public/app/web && cp app/web/index.html dist/app/web/index.html && cp app/web/styles.css dist/app/web/styles.css && cp app/web/ai-logo.png dist/app/web/ai-logo.png && cp app/web/index.html public/index.html && cp app/web/index.html public/app/web/index.html && cp app/web/styles.css public/app/web/styles.css && cp app/web/ai-logo.png public/app/web/ai-logo.png && cp dist/app/web/app.js public/app/web/app.js && cp prompts/system.txt dist/prompts/system.txt && cp prompts/client-prep-template.md dist/prompts/client-prep-template.md && cp prompts/examples/bridges.md dist/prompts/examples/bridges.md && cp prompts/examples/titan.md dist/prompts/examples/titan.md && cp knowledge/tpg/practice-summary.json dist/knowledge/tpg/practice-summary.json && cp knowledge/tpg/project-types-short.json dist/knowledge/tpg/project-types-short.json && cp knowledge/tpg/fit-rules.json dist/knowledge/tpg/fit-rules.json && cp knowledge/schemas/research-packet.schema.json dist/knowledge/schemas/research-packet.schema.json && cp data/test-inputs/bridges.json dist/data/test-inputs/bridges.json && cp data/test-outputs/bridges-output.md dist/data/test-outputs/bridges-output.md",
+    "check": "tsc --noEmit",
+    "start": "node --env-file=.env dist/server.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "typescript": "^5.8.2"
+  }
+}

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Client Prep Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/app/web/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="topbar-content">
+          <div class="topbar-logo-frame">
+            <img class="topbar-logo" src="/app/web/ai-logo.png" alt="AI Automation logo" />
+          </div>
+          <h1>Client Prep Agent</h1>
+          <p class="intro">
+            Research your clients and the people you are going to meet and share with
+            TPG attendees.
+          </p>
+        </div>
+        <div class="topbar-chip">SharePoint Embed Ready</div>
+      </header>
+
+      <main class="content">
+        <section class="panel form-panel">
+          <div class="section-heading">
+            <h2>Meeting Inputs</h2>
+          </div>
+          <form id="client-prep-form">
+            <label class="field">
+              <span>Company</span>
+              <input id="company" name="company" type="text" required />
+            </label>
+
+            <label class="field">
+              <span>Attendees</span>
+              <textarea
+                id="attendees"
+                name="attendees"
+                rows="4"
+                placeholder="One per line or comma-separated"
+                required
+              ></textarea>
+            </label>
+
+            <label class="field">
+              <span>Optional Meeting Objective</span>
+              <textarea
+                id="meetingObjective"
+                name="meetingObjective"
+                rows="3"
+              ></textarea>
+            </label>
+
+            <label class="field">
+              <span>Optional Notes</span>
+              <textarea id="notes" name="notes" rows="4"></textarea>
+            </label>
+
+            <div class="form-actions">
+              <button id="generate-button" type="submit">Generate</button>
+              <p id="status" class="status" aria-live="polite"></p>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel output-panel">
+          <div id="output" class="output" hidden></div>
+
+          <details id="debug-panel" class="debug-panel" hidden>
+            <summary>Debug View</summary>
+            <div class="debug-grid">
+              <section class="debug-card">
+                <h3>Metadata</h3>
+                <pre id="debug-meta"></pre>
+              </section>
+              <section class="debug-card">
+                <h3>Quality Report</h3>
+                <pre id="debug-quality"></pre>
+              </section>
+              <section class="debug-card">
+                <h3>Research Highlights</h3>
+                <pre id="debug-packet"></pre>
+              </section>
+              <section class="debug-card debug-card-wide">
+                <h3>Raw Model Response</h3>
+                <pre id="debug-raw"></pre>
+              </section>
+            </div>
+          </details>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/app/web/app.js"></script>
+  </body>
+</html>

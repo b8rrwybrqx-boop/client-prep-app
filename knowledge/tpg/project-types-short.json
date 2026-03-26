@@ -1,0 +1,197 @@
+[
+  {
+    "id": "category-leadership",
+    "name": "Category Leadership",
+    "practice_area": "Category Management",
+    "relevance_triggers": [
+      "category reset",
+      "retailer alignment",
+      "category growth strategy",
+      "growth pathway definition",
+      "retailer influence"
+    ],
+    "objective": "Provide an insight-led, retailer-ready category strategy that clarifies category role, identifies key growth drivers, defines priority growth pathways, and establishes activation guardrails.",
+    "outcomes": [
+      "defined category strategy",
+      "prioritized growth pathways",
+      "financial sizing and business case",
+      "initiative roadmap",
+      "customer-ready strategic implications"
+    ]
+  },
+  {
+    "id": "customer-business-planning",
+    "name": "Customer Business Planning (CBP / JBP)",
+    "practice_area": "Customer Strategy",
+    "relevance_triggers": [
+      "joint business planning",
+      "retailer planning",
+      "customer negotiation",
+      "customer-specific execution plan",
+      "aligning investments and initiatives with retailers"
+    ],
+    "objective": "Translate strategic or tactical priorities into a clear, executable customer plan aligned to retailer objectives, planning cycles, and commercial realities.",
+    "outcomes": [
+      "integrated customer plan",
+      "aligned initiatives and investments",
+      "clear execution logic",
+      "leadership alignment",
+      "stronger retailer alignment"
+    ]
+  },
+  {
+    "id": "commercial-strategy",
+    "name": "Commercial Strategy",
+    "practice_area": "Strategy & Innovation",
+    "relevance_triggers": [
+      "commercial stagnation",
+      "portfolio complexity",
+      "brand and channel misalignment",
+      "unclear growth priorities",
+      "need for a commercial north star"
+    ],
+    "objective": "Define a clear, integrated commercial strategy that aligns brand roles, channel priorities, value propositions, and investment choices to drive sustainable, profitable growth.",
+    "outcomes": [
+      "clear commercial direction and priorities",
+      "defined brand and channel roles",
+      "prioritized growth initiatives",
+      "clear guidance for downstream execution",
+      "stronger cross-functional alignment"
+    ]
+  },
+  {
+    "id": "channel-go-to-market-strategy",
+    "name": "Channel & Go-To-Market Strategy",
+    "practice_area": "Sales",
+    "relevance_triggers": [
+      "channel performance divergence",
+      "route-to-market questions",
+      "omnichannel acceleration",
+      "channel role confusion",
+      "execution inconsistency by channel"
+    ],
+    "objective": "Define how strategy reaches the market by clarifying channel roles, route-to-market choices, and execution priorities by channel and customer type.",
+    "outcomes": [
+      "channel and GTM strategy framework",
+      "clear channel roles and growth model",
+      "route-to-market design",
+      "channel activation roadmap"
+    ]
+  },
+  {
+    "id": "retail-growth-story",
+    "name": "Retail Growth Story",
+    "practice_area": "Sales",
+    "relevance_triggers": [
+      "retailer sell-in",
+      "customer-facing narrative",
+      "retailer influence",
+      "reset conversation",
+      "strategy is not landing with retailers"
+    ],
+    "objective": "Create a clear, compelling, retailer-ready growth story that shows how the category or brand will drive mutual growth, supported by evidence and aligned to retailer priorities.",
+    "outcomes": [
+      "retailer-ready growth narrative",
+      "evidence-backed proof points",
+      "customer-specific story variations",
+      "improved retailer influence and clarity"
+    ]
+  },
+  {
+    "id": "winning-formula",
+    "name": "Winning Formula",
+    "practice_area": "Sales",
+    "relevance_triggers": [
+      "multi-location inconsistency",
+      "site or territory performance variance",
+      "poor forecasting accuracy",
+      "misaligned staffing or training",
+      "need for network optimization"
+    ],
+    "objective": "Identify why performance varies across locations, territories, or agents and turn that into differentiated operating models, resource logic, and execution playbooks.",
+    "outcomes": [
+      "site-level performance driver model",
+      "location segmentation and archetypes",
+      "staffing and resource allocation logic",
+      "network optimization playbooks"
+    ]
+  },
+  {
+    "id": "marketing-media-performance",
+    "name": "Marketing & Media Performance",
+    "practice_area": "Marketing Performance",
+    "relevance_triggers": [
+      "marketing ROI pressure",
+      "retail media questions",
+      "investment allocation issues",
+      "weak funnel performance",
+      "measurement gaps"
+    ],
+    "objective": "Improve marketing and retail media effectiveness by clarifying the role of brand, shopper, performance, and retail media, and by establishing better investment and measurement discipline.",
+    "outcomes": [
+      "clear view of current marketing and media performance",
+      "defined role of retail media within the full funnel",
+      "prioritized investment opportunities",
+      "stronger linkage between marketing activity and commercial outcomes",
+      "embedded performance management system"
+    ]
+  },
+  {
+    "id": "org-of-the-future",
+    "name": "Org of the Future",
+    "practice_area": "Organization Design",
+    "relevance_triggers": [
+      "operating model friction",
+      "decision-rights confusion",
+      "governance issues",
+      "execution bottlenecks",
+      "need for organization redesign"
+    ],
+    "objective": "Design a future-state organization and operating model that clarifies roles, decision rights, governance, and capability needs so strategy can be executed more effectively.",
+    "outcomes": [
+      "future-state organization design",
+      "role and decision-rights clarity",
+      "governance and operating cadence model",
+      "capability and enablement roadmap",
+      "activation and change plan"
+    ]
+  },
+  {
+    "id": "multi-unit-strategy-execution",
+    "name": "Multi-Unit Strategy & Execution",
+    "practice_area": "Organization Design",
+    "relevance_triggers": [
+      "portfolio of business units",
+      "regional or BU divergence",
+      "post-merger integration",
+      "execution inconsistency across units",
+      "need to balance standardization vs localization"
+    ],
+    "objective": "Design a scalable multi-unit strategy that enables differentiated growth by unit while enforcing enterprise consistency where it matters most.",
+    "outcomes": [
+      "multi-unit strategic framework",
+      "unit archetypes and pathways",
+      "governance and decision-rights model",
+      "execution roadmap",
+      "scalable operating model logic"
+    ]
+  },
+  {
+    "id": "portfolio-focus-rationalization",
+    "name": "Portfolio Focus & Rationalization",
+    "practice_area": "Strategy & Innovation",
+    "relevance_triggers": [
+      "too many brands or platforms",
+      "resource dilution",
+      "portfolio overlap",
+      "margin drag from complexity",
+      "need to prioritize focus areas"
+    ],
+    "objective": "Prioritize brands, sub-brands, and platforms so resources are concentrated where they deliver the greatest strategic and financial return.",
+    "outcomes": [
+      "portfolio prioritization framework",
+      "focus vs deprioritization recommendations",
+      "financial and strategic trade-off summary"
+    ]
+  }
+]

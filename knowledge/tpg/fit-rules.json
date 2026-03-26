@@ -1,0 +1,123 @@
+{
+  "rules": [
+    {
+      "id": "strategy-growth",
+      "signals": [
+        "portfolio complexity",
+        "unclear growth strategy",
+        "innovation gaps",
+        "acquisition integration",
+        "category expansion"
+      ],
+      "practice": "Strategy & Innovation",
+      "use_cases": [
+        "define growth strategy",
+        "prioritize portfolio investment",
+        "build innovation roadmap",
+        "evaluate M&A or adjacency opportunities"
+      ]
+    },
+    {
+      "id": "marketing-performance",
+      "signals": [
+        "low brand growth",
+        "inefficient media spend",
+        "weak digital performance",
+        "declining brand equity",
+        "low category consumption"
+      ],
+      "practice": "Marketing Performance",
+      "use_cases": [
+        "improve brand performance",
+        "optimize media and digital spend",
+        "increase category demand",
+        "strengthen brand positioning"
+      ]
+    },
+    {
+      "id": "sales-commercial",
+      "signals": [
+        "revenue pressure",
+        "trade spend inefficiency",
+        "retailer pushback",
+        "poor in-store execution",
+        "pricing challenges"
+      ],
+      "practice": "Sales",
+      "use_cases": [
+        "improve trade ROI",
+        "optimize pricing and promo",
+        "strengthen retailer sell-in",
+        "improve commercial execution"
+      ]
+    },
+    {
+      "id": "digital-commerce",
+      "signals": [
+        "ecommerce underperformance",
+        "low digital shelf presence",
+        "channel conflict",
+        "marketplace growth gaps",
+        "online conversion issues"
+      ],
+      "practice": "Digital Commerce",
+      "use_cases": [
+        "grow eCommerce penetration",
+        "improve digital shelf",
+        "optimize marketplace strategy",
+        "align omnichannel execution"
+      ]
+    },
+    {
+      "id": "supply-chain",
+      "signals": [
+        "cost pressure",
+        "margin erosion",
+        "supply disruptions",
+        "inventory inefficiency",
+        "sustainability requirements"
+      ],
+      "practice": "Supply Chain",
+      "use_cases": [
+        "reduce COGS",
+        "improve reliability",
+        "optimize inventory and network",
+        "improve sustainability performance"
+      ]
+    },
+    {
+      "id": "organization-design",
+      "signals": [
+        "slow decision making",
+        "cross-functional misalignment",
+        "execution inconsistency",
+        "organizational complexity",
+        "integration challenges"
+      ],
+      "practice": "Organization Design",
+      "use_cases": [
+        "improve operating model",
+        "align teams and incentives",
+        "simplify organization",
+        "accelerate execution"
+      ]
+    },
+    {
+      "id": "talent-development",
+      "signals": [
+        "leadership gaps",
+        "capability gaps",
+        "low bench strength",
+        "high turnover",
+        "skills mismatch"
+      ],
+      "practice": "Talent Development",
+      "use_cases": [
+        "develop leadership capability",
+        "build technical skills",
+        "improve retention",
+        "strengthen talent pipeline"
+      ]
+    }
+  ]
+}

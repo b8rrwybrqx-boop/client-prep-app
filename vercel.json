@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/generate-client-prep.ts": {
+      "maxDuration": 60
+    }
+  }
+}
