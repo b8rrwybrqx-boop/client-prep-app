@@ -30,6 +30,11 @@ export interface LeadershipLookupResult {
   newsUrls?: string[];
 }
 
+const IS_VERCEL = process.env.VERCEL === "1";
+const FETCH_TIMEOUT_MS = Number(
+  process.env.RESEARCH_FETCH_TIMEOUT_MS || (IS_VERCEL ? 1800 : 3500)
+);
+
 function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -40,6 +45,14 @@ function slugify(value: string): string {
 
 function compactSlug(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function normalizePersonText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[.,']/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function domainRootLabel(url: string): string | null {
@@ -75,6 +88,10 @@ function decodeEntities(value: string): string {
   return decoded.replace(/&#(\d+);/g, (_, code) =>
     String.fromCharCode(Number(code))
   );
+}
+
+function stripTags(value: string): string {
+  return decodeEntities(value).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function htmlToLines(html: string): string[] {
@@ -138,8 +155,12 @@ function companyBaseCandidates(company: string, profile: CompanySiteProfile | nu
 }
 
 export async function fetchPage(url: string): Promise<FetchedPage | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
   try {
     const response = await fetch(url, {
+      signal: controller.signal,
       headers: {
         "User-Agent": "TPGClientPrepAssistant/0.1"
       }
@@ -158,6 +179,8 @@ export async function fetchPage(url: string): Promise<FetchedPage | null> {
     };
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -174,7 +197,7 @@ export async function discoverLeadershipLookup(
     };
   }
 
-  const homepageCandidates = companyBaseCandidates(company, profile);
+  const homepageCandidates = companyBaseCandidates(company, profile).slice(0, 4);
   let homepage: FetchedPage | null = null;
 
   for (const candidate of homepageCandidates) {
@@ -210,10 +233,10 @@ export async function discoverLeadershipLookup(
     homepage.html,
     homepage.url,
     /news|press|release|investor|financial|quarterly|results|stories/i,
-    6
+    4
   );
 
-  for (const candidate of leadershipCandidates) {
+  for (const candidate of leadershipCandidates.slice(0, 6)) {
     const page = await fetchPage(candidate);
 
     if (page && /leadership|management|executive|chief|president|officer/i.test(page.lines.join(" "))) {
@@ -268,7 +291,7 @@ async function searchDomain(
         return false;
       }
     })
-  ).slice(0, 2);
+  ).slice(0, IS_VERCEL ? 1 : 2);
 }
 
 function exactNameAndCompanyMatch(
@@ -281,6 +304,36 @@ function exactNameAndCompanyMatch(
     joined.includes(name.trim().toLowerCase()) &&
     joined.includes(company.trim().toLowerCase())
   );
+}
+
+function exactNameAndCompanyTextMatch(
+  text: string,
+  name: string,
+  company: string
+): boolean {
+  const normalizedText = normalizePersonText(text);
+  const normalizedName = normalizePersonText(name);
+  const normalizedCompany = normalizePersonText(company);
+
+  return (
+    normalizedText.includes(normalizedName) &&
+    normalizedText.includes(normalizedCompany)
+  );
+}
+
+function findNameStart(lines: string[], name: string): number {
+  const normalizedName = normalizePersonText(name);
+  const nameParts = normalizedName.split(" ").filter(Boolean);
+
+  return lines.findIndex((line) => {
+    const normalizedLine = normalizePersonText(line);
+
+    if (normalizedLine === normalizedName || normalizedLine.includes(normalizedName)) {
+      return true;
+    }
+
+    return nameParts.length > 1 && nameParts.every((part) => normalizedLine.includes(part));
+  });
 }
 
 function extractProfileDetails(
@@ -306,17 +359,13 @@ function extractProfileDetails(
     );
 
   const locationLine = lines.find((line) =>
-    /united states|, tn|, ny|, nj|, ca|nashville|seattle|chicago|dallas|atlanta/i.test(
-      line
-    )
+    /united states|,\s*[a-z]{2}\b/i.test(line)
   );
 
   const backgroundLines = lines.filter(
     (line) =>
       !line.toLowerCase().includes(lowerCompany) &&
-      /(ex-|former|previous|prior|university|school|mars|chewy|smiledirectclub)/i.test(
-        line
-      )
+      /(ex-|former|previous|prior|university|school)/i.test(line)
   );
 
   return {
@@ -343,7 +392,7 @@ export async function searchCompanyDirectoryProfiles(
     `https://rocketreach.co/${compactCompanySlug}-profile_b5c0000000000000`,
     `https://contactout.com/company/${companySlug}`,
     `https://contactout.com/company/${compactCompanySlug}`
-  ]);
+  ]).slice(0, IS_VERCEL ? 2 : 4);
 
   if (candidateUrls.length === 0) {
     return [];
@@ -355,9 +404,7 @@ export async function searchCompanyDirectoryProfiles(
     .filter(Boolean)
     .flatMap((page) => {
       const current = page!;
-      const start = current.lines.findIndex(
-        (line) => line.trim().toLowerCase() === name.trim().toLowerCase()
-      );
+      const start = findNameStart(current.lines, name);
 
       if (start < 0) {
         return [];
@@ -380,6 +427,15 @@ export async function searchCompanyDirectoryProfiles(
           source: new URL(current.url).hostname,
           url: current.url,
           title: titleLine,
+          background: window
+            .filter(
+              (line) =>
+                line !== titleLine &&
+                normalizePersonText(line) !== normalizePersonText(name)
+            )
+            .slice(0, 2)
+            .join(" ")
+            .trim() || undefined,
           location: locationLine
         }
       ];
@@ -391,12 +447,14 @@ export async function searchPublicProfileAggregators(
   name: string,
   company: string
 ): Promise<PublicProfileMatch[]> {
-  const domains = ["signalhire.com", "rocketreach.co", "contactout.com"];
+  const domains = IS_VERCEL
+    ? ["signalhire.com", "rocketreach.co"]
+    : ["signalhire.com", "rocketreach.co", "contactout.com"];
   const candidateUrls = unique(
     (
       await Promise.all(domains.map((domain) => searchDomain(name, company, domain)))
     ).flat()
-  ).slice(0, 5);
+  ).slice(0, IS_VERCEL ? 2 : 5);
 
   const pages = await Promise.all(candidateUrls.map((url) => fetchPage(url)));
 
@@ -422,6 +480,58 @@ export async function searchPublicProfileAggregators(
       ];
     })
     .slice(0, 2);
+}
+
+export async function searchPublicWebMentions(
+  name: string,
+  company: string
+): Promise<PublicProfileMatch[]> {
+  const query = `"${name}" "${company}"`;
+  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+  const page = await fetchPage(url);
+
+  if (!page) {
+    return [];
+  }
+
+  const titles = Array.from(
+    page.html.matchAll(/<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi),
+    (match) => ({
+      url: normalizeSearchUrl(decodeEntities(match[1])),
+      title: stripTags(match[2])
+    })
+  ).filter((item) => item.url) as Array<{ url: string; title: string }>;
+
+  const snippets = Array.from(
+    page.html.matchAll(/<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/gi),
+    (match) => stripTags(match[1])
+  );
+
+  return titles
+    .map((item, index) => {
+      const snippet = snippets[index] ?? "";
+      const combined = `${item.title} ${snippet}`.trim();
+
+      if (!exactNameAndCompanyTextMatch(combined, name, company)) {
+        return null;
+      }
+
+      const inferredTitle =
+        /(marketing director|marketing manager|director|manager|vice president|vp|chief|brand|innovation|sales|commercial)/i.test(
+          combined
+        )
+          ? combined
+          : undefined;
+
+      return {
+        source: new URL(item.url).hostname.replace(/^www\./, ""),
+        url: item.url,
+        title: inferredTitle,
+        background: snippet || item.title
+      };
+    })
+    .filter(Boolean)
+    .slice(0, IS_VERCEL ? 2 : 3) as PublicProfileMatch[];
 }
 
 export function extractLeadershipLinks(html: string, baseUrl: string): string[] {
@@ -479,13 +589,7 @@ export function extractImageAltNames(html: string): string[] {
   );
 
   const normalizedNames = matches
-    .map((name) => {
-      if (name.toLowerCase() === "eco nugenics") {
-        return "ecoNugenics";
-      }
-
-      return name;
-    })
+    .map((name) => name)
     .filter((name) => {
       if (!name) {
         return false;
@@ -540,7 +644,7 @@ export function extractPersonBlock(
       const line = lines[index];
 
       if (
-        line.startsWith("What do you love about working at Bridges?") ||
+        /\?$/.test(line) ||
         /^([A-Z][a-z]+ ){1,3}[A-Z][a-z]+$/.test(line)
       ) {
         break;

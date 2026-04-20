@@ -4,8 +4,12 @@ import {
   getCompanySiteProfile,
   searchCompanyDirectoryProfiles,
   searchPublicProfileAggregators,
+  searchPublicWebMentions,
   unique
 } from "./liveResearchUtils.js";
+import { searchWithOpenAiWeb } from "../app/api/openaiClient.js";
+
+const IS_VERCEL = process.env.VERCEL === "1";
 
 type SourceType =
   | "company-page"
@@ -36,6 +40,7 @@ export interface AttendeeResearchResult {
   verifiedTitle: string | null;
   verifiedRole: string | null;
   background: string | null;
+  secondarySignals?: string[];
   sourceType: SourceType;
   confidence: Confidence;
   note: string | null;
@@ -64,6 +69,21 @@ function normalizeName(value: string): string {
 function lastName(value: string): string {
   const parts = normalizeName(value).split(" ");
   return parts[parts.length - 1] ?? "";
+}
+
+function isLikelyStandalonePersonLine(line: string): boolean {
+  return /^[A-Z][a-z.'-]+(?:\s+[A-Z][a-z.'-]+){1,3}$/.test(line.trim());
+}
+
+function includesAnotherPersonName(line: string, attendeeName: string): boolean {
+  const normalizedAttendee = normalizeName(attendeeName);
+  const normalizedLine = normalizeName(line);
+
+  if (normalizedLine.includes(normalizedAttendee)) {
+    return false;
+  }
+
+  return /\b[A-Z][a-z.'-]+\s+[A-Z][a-z.'-]+\b/.test(line);
 }
 
 function inferRoleFromTitle(title: string | null): string | null {
@@ -133,6 +153,73 @@ function inferPriorities(title: string | null, company?: string): string[] {
   return unique(priorities);
 }
 
+function summarizeSecondarySignals(matches: Array<{
+  source: string;
+  title?: string;
+  background?: string;
+  location?: string;
+}>): string[] {
+  return unique(
+    matches
+      .map((match) => {
+        const details = [match.title, match.background, match.location]
+          .filter(Boolean)
+          .join("; ");
+
+        if (!details) {
+          return "";
+        }
+
+        return `${match.source}: ${details}`;
+      })
+      .filter(Boolean)
+  ).slice(0, 4);
+}
+
+async function searchAttendeeWithOpenAiWeb(
+  name: string,
+  company: string
+): Promise<Array<{
+  source: string;
+  url: string;
+  title?: string;
+  background?: string;
+}>> {
+  try {
+    const { outputText, citations } = await searchWithOpenAiWeb([
+      `Find public indexed information for attendee "${name}" at company "${company}".`,
+      "Return up to two likely traces with current or recent title/function if available.",
+      "If titles conflict, include both and say current title is unconfirmed.",
+      "Focus on marketing, brand, innovation, sales, commercial, finance, operations, or leadership clues.",
+      "Format:",
+      "1. [source summary]",
+      "2. [source summary]"
+    ].join("\n"));
+
+    const lines = outputText
+      .split(/\r?\n/)
+      .map((line) => line.replace(/^\d+\.\s*/, "").trim())
+      .filter(Boolean)
+      .slice(0, 2);
+
+    return lines.map((line, index) => {
+      const citation = citations[index];
+      const source = citation?.url
+        ? new URL(citation.url).hostname.replace(/^www\./, "")
+        : "web";
+
+      return {
+        source,
+        url: citation?.url ?? `https://${source}`,
+        title: line,
+        background: line
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
 function extractLinks(html: string, baseUrl: string, pattern: RegExp, limit = 12): string[] {
   const links = Array.from(
     html.matchAll(/<a[^>]+href="([^"]+)"/gi),
@@ -189,13 +276,15 @@ function findCompanyMatch(
   const normalizedAttendee = normalizeName(attendeeName);
   const normalizedLastName = lastName(attendeeName);
   const normalizedLines = lines.map((line) => normalizeName(line));
-  let start = normalizedLines.findIndex((line) => line === normalizedAttendee);
+  const exactStart = normalizedLines.findIndex((line) => line === normalizedAttendee);
+  let start = exactStart;
 
   if (start < 0) {
     start = normalizedLines.findIndex((line) => line.includes(normalizedAttendee));
   }
 
-  let confidence: Confidence = "high";
+  let confidence: Confidence = exactStart >= 0 ? "high" : "medium";
+  let exactMatch = start >= 0;
 
   if (start < 0 && normalizedLastName) {
     start = normalizedLines.findIndex(
@@ -206,25 +295,58 @@ function findCompanyMatch(
         )
     );
     confidence = "medium";
+    exactMatch = false;
   }
 
   if (start < 0) {
     return null;
   }
 
-  const window = lines.slice(Math.max(0, start - 1), start + 8);
+  const rawWindow = lines.slice(start, start + 8);
+  const boundedWindow: string[] = [];
+
+  for (const [index, line] of rawWindow.entries()) {
+    if (
+      index > 0 &&
+      isLikelyStandalonePersonLine(line) &&
+      normalizeName(line) !== normalizedAttendee
+    ) {
+      break;
+    }
+
+    boundedWindow.push(line);
+  }
+
+  if (!exactMatch) {
+    return {
+      title: null,
+      role: null,
+      background: null,
+      sourceType: pageKind,
+      confidence,
+      note:
+        pageKind === "company-news"
+          ? "Attendee last name appeared on a company-owned news page, but a direct identity match was not verified."
+          : "Attendee last name appeared on a company-owned leadership/team page, but a direct identity match was not verified.",
+      sourceUrl: pageUrl
+    };
+  }
+
   const title =
-    window.find((line) =>
+    boundedWindow
+      .slice(1)
+      .find((line) =>
       /(chief|president|vice president|vp|director|manager|officer|commercial|marketing|sales|finance|operations)/i.test(
         line
       )
-    ) ?? null;
+      ) ?? null;
   const background =
-    window
+    boundedWindow
       .filter(
         (line) =>
           line !== title &&
           normalizeName(line) !== normalizedAttendee &&
+          !includesAnotherPersonName(line, attendeeName) &&
           !/^(about|leadership|management|team|news|press releases)$/i.test(line)
       )
       .slice(0, pageKind === "company-news" ? 3 : 2)
@@ -280,7 +402,7 @@ export async function attendeeResearch(
   ).map((key) => {
     const [kind, url] = key.split("::");
     return { kind: kind as "company-page" | "company-news", url };
-  });
+  }).slice(0, IS_VERCEL ? 6 : 10);
 
   const fetchedPages = await Promise.all(
     companyPagesToCheck.map(async (page) => ({
@@ -311,16 +433,36 @@ export async function attendeeResearch(
         company && !directCompanyMatch
           ? await searchPublicProfileAggregators(name, company)
           : [];
-      const secondaryMatch = directoryMatches[0] ?? aggregatorMatches[0] ?? null;
+      const webMentionMatches =
+        company && !directCompanyMatch
+          ? await searchPublicWebMentions(name, company)
+          : [];
+      const openAiWebMatches =
+        company && !directCompanyMatch && !directoryMatches[0] && !aggregatorMatches[0]
+          ? await searchAttendeeWithOpenAiWeb(name, company)
+          : [];
+      const secondaryMatch =
+        directoryMatches[0] ??
+        aggregatorMatches[0] ??
+        webMentionMatches[0] ??
+        openAiWebMatches[0] ??
+        null;
+      const secondarySignals = summarizeSecondarySignals([
+        ...directoryMatches,
+        ...aggregatorMatches,
+        ...webMentionMatches,
+        ...openAiWebMatches
+      ]);
+      const hasSecondaryEvidence = secondarySignals.length > 0;
 
       const sourceType: SourceType = directCompanyMatch
         ? directCompanyMatch.sourceType
-        : secondaryMatch
+        : secondaryMatch || hasSecondaryEvidence
           ? "secondary-profile"
           : "not-found";
       const verificationLevel = directCompanyMatch
         ? "company-site"
-        : secondaryMatch
+        : secondaryMatch || hasSecondaryEvidence
           ? "secondary-public-profile"
           : "unverified";
       const verifiedTitle = directCompanyMatch?.title ?? secondaryMatch?.title ?? null;
@@ -335,11 +477,15 @@ export async function attendeeResearch(
         ? directCompanyMatch.confidence
         : secondaryMatch
           ? "medium"
+          : hasSecondaryEvidence
+            ? "low"
           : "low";
       const note =
         directCompanyMatch?.note ??
         (secondaryMatch
-          ? `Company-owned pages did not surface a direct match; using secondary public-profile evidence from ${secondaryMatch.source}.`
+          ? `Company-owned pages did not surface a direct match; publicly indexed secondary sources suggest a likely attendee/company match.`
+          : hasSecondaryEvidence
+            ? "Company-owned pages did not surface a direct match; weaker public-profile evidence suggests a possible attendee/company connection."
           : company
             ? `No attendee match found on company-owned pages for ${company}; secondary-profile fallback also did not return a confident match.`
             : "No attendee match was found automatically.");
@@ -355,6 +501,7 @@ export async function attendeeResearch(
         verifiedTitle,
         verifiedRole,
         background,
+        secondarySignals,
         sourceType,
         confidence,
         note,
@@ -367,6 +514,7 @@ export async function attendeeResearch(
             titleEvidence,
             background,
             note,
+            ...secondarySignals,
             secondaryMatch?.location ? `Location: ${secondaryMatch.location}` : ""
           ].filter(Boolean) as string[]
         ),
@@ -385,13 +533,21 @@ export async function attendeeResearch(
             : "Known public-profile directory lookup skipped because company was not provided.",
           company
             ? `Checked public-profile aggregators for exact name + company match: ${name} + ${company}`
-            : "Public-profile aggregator lookup skipped because company was not provided."
+            : "Public-profile aggregator lookup skipped because company was not provided.",
+          company
+            ? `Checked public web search results for attendee + company mentions: ${name} + ${company}`
+            : "Public web attendee mention lookup skipped because company was not provided.",
+          company
+            ? `Checked OpenAI web search fallback for attendee + company: ${name} + ${company}`
+            : "OpenAI web search fallback skipped because company was not provided."
         ],
         sources: unique([
           ...(homepagePage ? [homepagePage.url] : []),
           ...companyOwnedMatches.map((match) => match.sourceUrl),
           ...directoryMatches.map((match) => match.url),
-          ...aggregatorMatches.map((match) => match.url)
+          ...aggregatorMatches.map((match) => match.url),
+          ...webMentionMatches.map((match) => match.url),
+          ...openAiWebMatches.map((match) => match.url)
         ])
       };
     })

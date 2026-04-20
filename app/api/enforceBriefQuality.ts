@@ -2,6 +2,7 @@ import type { ResearchPacket } from "./buildResearchPacket.js";
 
 export interface BriefQualityReport {
   missingSections: string[];
+  underfilledSections: string[];
   appliedFixes: string[];
   packetWarnings: string[];
 }
@@ -43,13 +44,55 @@ const sectionAliases: Record<string, string> = {
   "suggested meeting posture": "Suggested Next-Step Direction"
 };
 
+const sectionDisplayLabels: Record<string, string> = {
+  "Competitive Context": "Competition",
+  "Macro Industry / Ecosystem Context": "Macro Environment",
+  "Category / Segment Context": "Category / Segment",
+  "Stakeholder Context": "Stakeholder",
+  "Likely Priorities / Implications": "Priorities / Implications",
+  "What TPG Should Emphasize": "TPG Angle",
+  "Recommended Questions": "Questions"
+};
+
 function normalizeSectionLabel(value: string): string {
   const normalized = value
+    .replace(/^[-*]\s+/, "")
     .replace(/^[#\d.)\s-]+/, "")
     .replace(/:$/, "")
     .trim();
 
-  return sectionAliases[normalized.toLowerCase()] ?? normalized;
+  const lowered = normalized.toLowerCase();
+  const directAlias = sectionAliases[lowered];
+
+  if (directAlias) {
+    return directAlias;
+  }
+
+  for (const section of requiredSections) {
+    const prefix = section.toLowerCase();
+
+    if (
+      lowered.startsWith(`${prefix} — `) ||
+      lowered.startsWith(`${prefix} - `) ||
+      lowered.startsWith(`${prefix}: `)
+    ) {
+      return section;
+    }
+  }
+
+  return normalized;
+}
+
+function isRecognizedSectionLabel(value: string): boolean {
+  const normalized = normalizeSectionLabel(value);
+
+  return requiredSections.includes(
+    normalized as (typeof requiredSections)[number]
+  );
+}
+
+function displaySectionLabel(value: string): string {
+  return sectionDisplayLabels[value] ?? value;
 }
 
 function formatBullet(line: string, index: number, section: string): string {
@@ -122,6 +165,7 @@ export function enforceBriefQuality(
   const lines = markdown.split(/\r?\n/);
   const output: string[] = [];
   const seenSections = new Set<string>();
+  const sectionBulletCounts = new Map<string, number>();
   const fixes: string[] = [];
   let currentSection = "";
   let bulletIndex = 0;
@@ -140,7 +184,19 @@ export function enforceBriefQuality(
     const isNumberedHeading =
       currentSection !== "Recommended Questions" &&
       (/^\d+\)\s+/.test(trimmed) || /^\d+\.\s+/.test(trimmed));
-    const isHeading = trimmed.startsWith("#") || isNumberedHeading;
+    const isBulletSectionLabel =
+      /^[-*]\s+/.test(trimmed) &&
+      !trimmed.includes(":") &&
+      isRecognizedSectionLabel(trimmed);
+    const isPlainSectionLabel =
+      !/^[-*]\s+/.test(trimmed) &&
+      !trimmed.includes(":") &&
+      isRecognizedSectionLabel(trimmed);
+    const isHeading =
+      trimmed.startsWith("#") ||
+      isNumberedHeading ||
+      isPlainSectionLabel ||
+      isBulletSectionLabel;
 
     if (isHeading) {
       const sectionName = normalizeSectionLabel(trimmed);
@@ -165,8 +221,9 @@ export function enforceBriefQuality(
         fixes.push(`Normalized heading: ${sectionName}`);
       }
 
-      output.push(`## ${sectionName}`);
+      output.push(`## ${displaySectionLabel(sectionName)}`);
       seenSections.add(sectionName);
+      sectionBulletCounts.set(sectionName, 0);
       currentSection = sectionName;
       bulletIndex = 0;
       lastNormalizedBullet = "";
@@ -196,6 +253,12 @@ export function enforceBriefQuality(
         output.push(formatted);
         lastNormalizedBullet = dedupeKey;
         bulletIndex += 1;
+        if (currentSection) {
+          sectionBulletCounts.set(
+            currentSection,
+            (sectionBulletCounts.get(currentSection) ?? 0) + 1
+          );
+        }
       }
 
       continue;
@@ -214,6 +277,10 @@ export function enforceBriefQuality(
       fixes.push(`Converted paragraph to bullet in ${currentSection}`);
       lastNormalizedBullet = dedupeKey;
       bulletIndex += 1;
+      sectionBulletCounts.set(
+        currentSection,
+        (sectionBulletCounts.get(currentSection) ?? 0) + 1
+      );
       continue;
     }
 
@@ -231,15 +298,29 @@ export function enforceBriefQuality(
   }
 
   const missingSections = requiredSections.filter((section) => !seenSections.has(section));
+  const underfilledSections = requiredSections.filter((section) => {
+    if (!seenSections.has(section)) {
+      return false;
+    }
+
+    const count = sectionBulletCounts.get(section) ?? 0;
+    const minimum = section === "Meeting Context" ? 1 : 2;
+    return count < minimum;
+  });
 
   if (missingSections.length > 0) {
     fixes.push("Detected missing required sections.");
+  }
+
+  if (underfilledSections.length > 0) {
+    fixes.push("Detected underfilled sections.");
   }
 
   return {
     markdown: output.join("\n").replace(/\n{3,}/g, "\n\n").trim(),
     report: {
       missingSections,
+      underfilledSections,
       appliedFixes: Array.from(new Set(fixes)),
       packetWarnings: packetWarnings(researchPacket)
     }

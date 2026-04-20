@@ -34,6 +34,7 @@ function escapeHtml(value: string): string {
 
 function renderInline(value: string): string {
   return escapeHtml(value)
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*\*/g, "")
     .replace(/\*(?=[A-Za-z])/g, "")

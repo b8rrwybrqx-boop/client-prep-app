@@ -61,6 +61,12 @@
           "background": {
             "type": ["string", "null"]
           },
+          "secondarySignals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "sourceType": {
             "type": "string",
             "enum": ["company-page", "company-news", "secondary-profile", "inferred", "not-found"]
