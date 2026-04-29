@@ -232,7 +232,7 @@ interface OpenAiAttendeeSearchResult {
 async function searchAttendeeWithOpenAiWeb(
   name: string,
   company: string,
-  refinement?: { title?: string }
+  refinement?: { title?: string; broaden?: boolean }
 ): Promise<OpenAiAttendeeSearchResult> {
   try {
     const promptLines = refinement?.title
@@ -244,15 +244,26 @@ async function searchAttendeeWithOpenAiWeb(
           "1. [signal summary]",
           "2. [signal summary]"
         ]
-      : [
-          `Find public indexed information for attendee "${name}" at company "${company}".`,
-          "Return up to two likely traces with current or recent title/function if available.",
-          "If titles conflict, include both and say current title is unconfirmed.",
-          "Focus on marketing, brand, innovation, sales, commercial, finance, operations, or leadership clues.",
-          "Format:",
-          "1. [source summary]",
-          "2. [source summary]"
-        ];
+      : refinement?.broaden
+        ? [
+            `Find any public indexed reference connecting "${name}" with "${company}", its parent or subsidiaries, or any of its known brands.`,
+            "Be thorough. Consider: LinkedIn profiles (current or past), press releases, conference speaker lists, podcast appearances, trade publications, brand-specific announcements, patent or regulatory filings, and quoted commentary.",
+            "Allow for nickname / full-name pairs (Mike↔Michael, Bill↔William, Jimmy↔James, Liz↔Elizabeth), alternate spellings, and alternate publishing names.",
+            "If multiple plausible candidates exist, return up to two with brief reasoning about how each connects to the company.",
+            "Only declare 'no match' after considering brand-team and subsidiary roles, not just corporate-level positions.",
+            "Format:",
+            "1. [signal summary]",
+            "2. [signal summary]"
+          ]
+        : [
+            `Find public indexed information for attendee "${name}" at company "${company}".`,
+            "Return up to two likely traces with current or recent title/function if available.",
+            "If titles conflict, include both and say current title is unconfirmed.",
+            "Focus on marketing, brand, innovation, sales, commercial, finance, operations, or leadership clues.",
+            "Format:",
+            "1. [source summary]",
+            "2. [source summary]"
+          ];
 
     const { outputText, citations } = await searchWithOpenAiWeb(promptLines.join("\n"));
 
@@ -501,10 +512,25 @@ export async function attendeeResearch(
       // verified title — including the case where a company match was found via
       // last-name fallback only (no title captured).
       const companyMatchHasTitle = Boolean(directCompanyMatch?.title);
-      const primaryOpenAi =
+      let primaryOpenAi =
         company && !companyMatchHasTitle
           ? await searchAttendeeWithOpenAiWeb(name, company)
           : { matches: [], citations: [] };
+
+      // Retry once with a broader prompt if the first attempt returned nothing.
+      // Web search is non-deterministic; a different query strategy often surfaces
+      // brand-team or subsidiary roles that the generic prompt misses.
+      let primaryOpenAiBroadened = false;
+      if (
+        company &&
+        !companyMatchHasTitle &&
+        primaryOpenAi.matches.length === 0
+      ) {
+        primaryOpenAi = await searchAttendeeWithOpenAiWeb(name, company, {
+          broaden: true
+        });
+        primaryOpenAiBroadened = true;
+      }
 
       // Phase 3: title-aware enrichment pass — runs whenever we have any title to refine on.
       const firstPassTitle =
@@ -628,7 +654,9 @@ export async function attendeeResearch(
               `Checked company-owned ${page.kind === "company-news" ? "news" : "leadership/about/team"} page: ${page.url}`
           ),
           company && !companyMatchHasTitle
-            ? `Ran OpenAI web search as primary attendee lookup: ${name} + ${company}`
+            ? primaryOpenAiBroadened
+              ? `Ran OpenAI web search as primary attendee lookup (initial query returned nothing; retried with broader prompt): ${name} + ${company}`
+              : `Ran OpenAI web search as primary attendee lookup: ${name} + ${company}`
             : company
               ? "Skipped primary OpenAI web search because company-owned pages already captured a verified title."
               : "OpenAI web search skipped because company was not provided.",
