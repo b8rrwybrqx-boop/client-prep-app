@@ -244,6 +244,14 @@ export function enforceBriefQuality(
         continue;
       }
 
+      // Preserve ### subheadings as part of the current ## section so their bullets
+      // count toward the parent section instead of creating a phantom new section.
+      if (trimmed.startsWith("### ") && currentSection) {
+        output.push(trimmed);
+        lastNormalizedBullet = "";
+        continue;
+      }
+
       if (trimmed !== `## ${sectionName}`) {
         fixes.push(`Normalized heading: ${sectionName}`);
       }

@@ -150,7 +150,7 @@ export async function buildPrompt(
           `- Attendees to write up: ${researchPacket.input.attendees.join(", ")}`,
           `- Company to cross-reference: ${researchPacket.input.company}`,
           "- For each attendee, write a tight block of label-first bullets. Default labels: **Verified:**, **Background:**, **Likely Priorities:**, **Likely Lens:**.",
-          "- If the brief includes more than one attendee, give each their own ### sub-heading using the attendee's name.",
+          "- If the brief includes more than one attendee, give each their own ### sub-heading using the attendee's full name in Title Case (e.g., 'Jimmy Jia', 'Mike Hayes'), even when the input was lowercase or stylized.",
           "- VERIFIED line: state the attendee's title and remit in one sentence. If the title comes from a company-owned page (sourceType company-page or company-news), present it as verified.",
           "- If the title was sourced via OpenAI web search, treat any company-owned domain (press release on the company's own corporate or investor site) as verified. Cite the source briefly inline, e.g. 'per 8/4/2025 PetSmart corporate press release'.",
           "- If only directory or aggregator evidence is available (sourceType secondary-profile, no company-owned URL), phrase the title as 'reported by secondary public sources' and note that current title should be treated as unconfirmed.",

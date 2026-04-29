@@ -497,9 +497,12 @@ export async function attendeeResearch(
         companyOwnedMatches[0] ??
         null;
 
-      // Phase 2: OpenAI web search promoted to primary lookup when no direct company match.
+      // Phase 2: OpenAI web search runs when company-owned pages did not yield a
+      // verified title — including the case where a company match was found via
+      // last-name fallback only (no title captured).
+      const companyMatchHasTitle = Boolean(directCompanyMatch?.title);
       const primaryOpenAi =
-        company && !directCompanyMatch
+        company && !companyMatchHasTitle
           ? await searchAttendeeWithOpenAiWeb(name, company)
           : { matches: [], citations: [] };
 
@@ -511,18 +514,18 @@ export async function attendeeResearch(
           ? await searchAttendeeWithOpenAiWeb(name, company, { title: firstPassTitle })
           : { matches: [], citations: [] };
 
-      // Phase 4: legacy aggregators only as last-resort fallback.
-      const haveAnyMatch = Boolean(directCompanyMatch) || primaryOpenAi.matches.length > 0;
+      // Phase 4: legacy aggregators only as last-resort fallback when nothing else returned a title.
+      const haveAnyTitle = Boolean(firstPassTitle);
       const directoryMatches =
-        company && !haveAnyMatch
+        company && !haveAnyTitle
           ? await searchCompanyDirectoryProfiles(name, company)
           : [];
       const aggregatorMatches =
-        company && !haveAnyMatch
+        company && !haveAnyTitle
           ? await searchPublicProfileAggregators(name, company)
           : [];
       const webMentionMatches =
-        company && !haveAnyMatch
+        company && !haveAnyTitle
           ? await searchPublicWebMentions(name, company)
           : [];
 
@@ -624,16 +627,16 @@ export async function attendeeResearch(
             (page) =>
               `Checked company-owned ${page.kind === "company-news" ? "news" : "leadership/about/team"} page: ${page.url}`
           ),
-          company && !directCompanyMatch
+          company && !companyMatchHasTitle
             ? `Ran OpenAI web search as primary attendee lookup: ${name} + ${company}`
             : company
-              ? "Skipped primary OpenAI web search because company-owned pages already verified the attendee."
+              ? "Skipped primary OpenAI web search because company-owned pages already captured a verified title."
               : "OpenAI web search skipped because company was not provided.",
           firstPassTitle
             ? `Ran title-aware OpenAI web search for enrichment: ${name} + ${firstPassTitle} + ${company ?? ""}`
             : "Skipped title-aware OpenAI enrichment because no first-pass title was available.",
-          haveAnyMatch
-            ? "Skipped legacy directory/aggregator/web-mention fallbacks because primary lookup succeeded."
+          haveAnyTitle
+            ? "Skipped legacy directory/aggregator/web-mention fallbacks because a title was already captured."
             : company
               ? `Ran legacy directory/aggregator/web-mention fallbacks for ${name} + ${company}`
               : "Legacy directory/aggregator/web-mention fallbacks skipped because company was not provided."
