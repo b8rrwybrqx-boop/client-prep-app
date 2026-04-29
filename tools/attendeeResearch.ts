@@ -176,25 +176,43 @@ function summarizeSecondarySignals(matches: Array<{
   ).slice(0, 4);
 }
 
+interface OpenAiAttendeeSearchResult {
+  matches: Array<{
+    source: string;
+    url: string;
+    title?: string;
+    background?: string;
+    location?: string;
+  }>;
+  citations: Array<{ url: string; title?: string }>;
+}
+
 async function searchAttendeeWithOpenAiWeb(
   name: string,
-  company: string
-): Promise<Array<{
-  source: string;
-  url: string;
-  title?: string;
-  background?: string;
-}>> {
+  company: string,
+  refinement?: { title?: string }
+): Promise<OpenAiAttendeeSearchResult> {
   try {
-    const { outputText, citations } = await searchWithOpenAiWeb([
-      `Find public indexed information for attendee "${name}" at company "${company}".`,
-      "Return up to two likely traces with current or recent title/function if available.",
-      "If titles conflict, include both and say current title is unconfirmed.",
-      "Focus on marketing, brand, innovation, sales, commercial, finance, operations, or leadership clues.",
-      "Format:",
-      "1. [source summary]",
-      "2. [source summary]"
-    ].join("\n"));
+    const promptLines = refinement?.title
+      ? [
+          `Find recent public information about "${name}", ${refinement.title} at "${company}".`,
+          "Prefer the last 24 months: quotes in articles, conference talks, podcast appearances, press releases, notable initiatives, or strategic priorities they have spoken to.",
+          "Return up to two concise bullets summarizing distinct signals.",
+          "Format:",
+          "1. [signal summary]",
+          "2. [signal summary]"
+        ]
+      : [
+          `Find public indexed information for attendee "${name}" at company "${company}".`,
+          "Return up to two likely traces with current or recent title/function if available.",
+          "If titles conflict, include both and say current title is unconfirmed.",
+          "Focus on marketing, brand, innovation, sales, commercial, finance, operations, or leadership clues.",
+          "Format:",
+          "1. [source summary]",
+          "2. [source summary]"
+        ];
+
+    const { outputText, citations } = await searchWithOpenAiWeb(promptLines.join("\n"));
 
     const lines = outputText
       .split(/\r?\n/)
@@ -202,7 +220,7 @@ async function searchAttendeeWithOpenAiWeb(
       .filter(Boolean)
       .slice(0, 2);
 
-    return lines.map((line, index) => {
+    const matches = lines.map((line, index) => {
       const citation = citations[index];
       const source = citation?.url
         ? new URL(citation.url).hostname.replace(/^www\./, "")
@@ -215,9 +233,21 @@ async function searchAttendeeWithOpenAiWeb(
         background: line
       };
     });
+
+    return { matches, citations };
   } catch {
-    return [];
+    return { matches: [], citations: [] };
   }
+}
+
+function extractLinkedinUrls(
+  citations: Array<{ url: string; title?: string }>
+): string[] {
+  return unique(
+    citations
+      .map((citation) => citation.url)
+      .filter((url) => /linkedin\.com\/(in|pub|company)/i.test(url))
+  );
 }
 
 function extractLinks(html: string, baseUrl: string, pattern: RegExp, limit = 12): string[] {
@@ -425,35 +455,58 @@ export async function attendeeResearch(
         companyOwnedMatches[0] ??
         null;
 
-      const directoryMatches =
+      // Phase 2: OpenAI web search promoted to primary lookup when no direct company match.
+      const primaryOpenAi =
         company && !directCompanyMatch
+          ? await searchAttendeeWithOpenAiWeb(name, company)
+          : { matches: [], citations: [] };
+
+      // Phase 3: title-aware enrichment pass — runs whenever we have any title to refine on.
+      const firstPassTitle =
+        directCompanyMatch?.title ?? primaryOpenAi.matches[0]?.title ?? null;
+      const titleEnrichedOpenAi =
+        company && firstPassTitle
+          ? await searchAttendeeWithOpenAiWeb(name, company, { title: firstPassTitle })
+          : { matches: [], citations: [] };
+
+      // Phase 4: legacy aggregators only as last-resort fallback.
+      const haveAnyMatch = Boolean(directCompanyMatch) || primaryOpenAi.matches.length > 0;
+      const directoryMatches =
+        company && !haveAnyMatch
           ? await searchCompanyDirectoryProfiles(name, company)
           : [];
       const aggregatorMatches =
-        company && !directCompanyMatch
+        company && !haveAnyMatch
           ? await searchPublicProfileAggregators(name, company)
           : [];
       const webMentionMatches =
-        company && !directCompanyMatch
+        company && !haveAnyMatch
           ? await searchPublicWebMentions(name, company)
           : [];
-      const openAiWebMatches =
-        company && !directCompanyMatch && !directoryMatches[0] && !aggregatorMatches[0]
-          ? await searchAttendeeWithOpenAiWeb(name, company)
-          : [];
+
       const secondaryMatch =
+        primaryOpenAi.matches[0] ??
         directoryMatches[0] ??
         aggregatorMatches[0] ??
         webMentionMatches[0] ??
-        openAiWebMatches[0] ??
         null;
       const secondarySignals = summarizeSecondarySignals([
+        ...primaryOpenAi.matches,
+        ...titleEnrichedOpenAi.matches,
         ...directoryMatches,
         ...aggregatorMatches,
-        ...webMentionMatches,
-        ...openAiWebMatches
+        ...webMentionMatches
       ]);
       const hasSecondaryEvidence = secondarySignals.length > 0;
+      const linkedinUrls = extractLinkedinUrls([
+        ...primaryOpenAi.citations,
+        ...titleEnrichedOpenAi.citations
+      ]);
+      const allOpenAiCitations = unique(
+        [...primaryOpenAi.citations, ...titleEnrichedOpenAi.citations].map(
+          (citation) => citation.url
+        )
+      );
 
       const sourceType: SourceType = directCompanyMatch
         ? directCompanyMatch.sourceType
@@ -515,6 +568,7 @@ export async function attendeeResearch(
             background,
             note,
             ...secondarySignals,
+            ...linkedinUrls.map((url) => `LinkedIn: ${url}`),
             secondaryMatch?.location ? `Location: ${secondaryMatch.location}` : ""
           ].filter(Boolean) as string[]
         ),
@@ -528,26 +582,30 @@ export async function attendeeResearch(
             (page) =>
               `Checked company-owned ${page.kind === "company-news" ? "news" : "leadership/about/team"} page: ${page.url}`
           ),
-          company
-            ? `Checked known public-profile directory pages for ${company}`
-            : "Known public-profile directory lookup skipped because company was not provided.",
-          company
-            ? `Checked public-profile aggregators for exact name + company match: ${name} + ${company}`
-            : "Public-profile aggregator lookup skipped because company was not provided.",
-          company
-            ? `Checked public web search results for attendee + company mentions: ${name} + ${company}`
-            : "Public web attendee mention lookup skipped because company was not provided.",
-          company
-            ? `Checked OpenAI web search fallback for attendee + company: ${name} + ${company}`
-            : "OpenAI web search fallback skipped because company was not provided."
+          company && !directCompanyMatch
+            ? `Ran OpenAI web search as primary attendee lookup: ${name} + ${company}`
+            : company
+              ? "Skipped primary OpenAI web search because company-owned pages already verified the attendee."
+              : "OpenAI web search skipped because company was not provided.",
+          firstPassTitle
+            ? `Ran title-aware OpenAI web search for enrichment: ${name} + ${firstPassTitle} + ${company ?? ""}`
+            : "Skipped title-aware OpenAI enrichment because no first-pass title was available.",
+          haveAnyMatch
+            ? "Skipped legacy directory/aggregator/web-mention fallbacks because primary lookup succeeded."
+            : company
+              ? `Ran legacy directory/aggregator/web-mention fallbacks for ${name} + ${company}`
+              : "Legacy directory/aggregator/web-mention fallbacks skipped because company was not provided."
         ],
         sources: unique([
           ...(homepagePage ? [homepagePage.url] : []),
           ...companyOwnedMatches.map((match) => match.sourceUrl),
+          ...primaryOpenAi.matches.map((match) => match.url),
+          ...titleEnrichedOpenAi.matches.map((match) => match.url),
+          ...allOpenAiCitations,
+          ...linkedinUrls,
           ...directoryMatches.map((match) => match.url),
           ...aggregatorMatches.map((match) => match.url),
-          ...webMentionMatches.map((match) => match.url),
-          ...openAiWebMatches.map((match) => match.url)
+          ...webMentionMatches.map((match) => match.url)
         ])
       };
     })
