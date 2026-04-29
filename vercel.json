@@ -3,6 +3,10 @@
     "api/generate-client-prep.ts": {
       "maxDuration": 300,
       "includeFiles": "prompts/**"
+    },
+    "api/generate-client-prep-phase-2.ts": {
+      "maxDuration": 300,
+      "includeFiles": "prompts/**"
     }
   }
 }

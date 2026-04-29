@@ -28,6 +28,24 @@ const requiredSections = [
   "Suggested Next-Step Direction"
 ] as const;
 
+const PHASE_1_REQUIRED_SECTIONS: ReadonlyArray<typeof requiredSections[number]> = [
+  "Company Snapshot",
+  "Competitive Context",
+  "Macro Industry / Ecosystem Context",
+  "Category / Segment Context",
+  "Stakeholder Context",
+  "Likely Priorities / Implications",
+  "Meeting Context"
+];
+
+const PHASE_2_REQUIRED_SECTIONS: ReadonlyArray<typeof requiredSections[number]> = [
+  "What TPG Should Emphasize",
+  "Recommended Questions",
+  "Suggested Next-Step Direction"
+];
+
+export type QualityPhase = "phase1" | "phase2" | "all";
+
 const sectionAliases: Record<string, string> = {
   "macro industry / ecosystem": "Macro Industry / Ecosystem Context",
   "macro industry / ecosystem context": "Macro Industry / Ecosystem Context",
@@ -96,7 +114,7 @@ function displaySectionLabel(value: string): string {
 }
 
 function formatBullet(line: string, index: number, section: string): string {
-  const value = line.replace(/^[-*]\s*/, "").replace(/^\d+\.\s*/, "").trim();
+  const value = line.replace(/^[-*]\s+/, "").replace(/^\d+\.\s*/, "").trim();
 
   if (!value) {
     return "";
@@ -160,8 +178,17 @@ function packetWarnings(packet: ResearchPacket): string[] {
 
 export function enforceBriefQuality(
   markdown: string,
-  researchPacket: ResearchPacket
+  researchPacket: ResearchPacket,
+  options: { phase?: QualityPhase } = {}
 ): { markdown: string; report: BriefQualityReport } {
+  const phase = options.phase ?? "all";
+  const phaseRequiredSections =
+    phase === "phase1"
+      ? PHASE_1_REQUIRED_SECTIONS
+      : phase === "phase2"
+        ? PHASE_2_REQUIRED_SECTIONS
+        : requiredSections;
+  const allowMeetingContextAutoAdd = phase !== "phase2";
   const lines = markdown.split(/\r?\n/);
   const output: string[] = [];
   const seenSections = new Set<string>();
@@ -288,6 +315,7 @@ export function enforceBriefQuality(
   }
 
   if (
+    allowMeetingContextAutoAdd &&
     !seenSections.has("Meeting Context") &&
     researchPacket.input.meetingObjective.trim()
   ) {
@@ -297,8 +325,8 @@ export function enforceBriefQuality(
     fixes.push("Added Meeting Context from request input.");
   }
 
-  const missingSections = requiredSections.filter((section) => !seenSections.has(section));
-  const underfilledSections = requiredSections.filter((section) => {
+  const missingSections = phaseRequiredSections.filter((section) => !seenSections.has(section));
+  const underfilledSections = phaseRequiredSections.filter((section) => {
     if (!seenSections.has(section)) {
       return false;
     }

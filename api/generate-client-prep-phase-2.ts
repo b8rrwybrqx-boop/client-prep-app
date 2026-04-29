@@ -1,4 +1,8 @@
-import { generateClientPrepPhase1 } from "../app/api/generate-client-prep.js";
+import {
+  generateClientPrepPhase2,
+  type ClientPrepPhase2Result
+} from "../app/api/generate-client-prep.js";
+import type { ResearchPacket } from "../app/api/buildResearchPacket.js";
 
 interface VercelLikeRequest {
   method?: string;
@@ -11,28 +15,18 @@ interface VercelLikeResponse {
   json(payload: unknown): void;
 }
 
-function normalizeBody(body: unknown): {
-  company?: string;
-  attendees?: string;
-  meetingObjective?: string;
-  notes?: string;
-} {
+interface Phase2RequestBody {
+  researchPacket?: ResearchPacket;
+  phase1Markdown?: string;
+}
+
+function normalizeBody(body: unknown): Phase2RequestBody {
   if (typeof body === "string") {
-    return JSON.parse(body) as {
-      company?: string;
-      attendees?: string;
-      meetingObjective?: string;
-      notes?: string;
-    };
+    return JSON.parse(body) as Phase2RequestBody;
   }
 
   if (body && typeof body === "object") {
-    return body as {
-      company?: string;
-      attendees?: string;
-      meetingObjective?: string;
-      notes?: string;
-    };
+    return body as Phase2RequestBody;
   }
 
   return {};
@@ -51,19 +45,17 @@ export default async function handler(
   try {
     const input = normalizeBody(request.body);
 
-    if (!input.company?.trim() || !input.attendees?.trim()) {
+    if (!input.researchPacket || !input.phase1Markdown?.trim()) {
       response.status(400).json({
-        error: "Company and attendees are required."
+        error: "researchPacket and phase1Markdown are required."
       });
       return;
     }
 
-    const result = await generateClientPrepPhase1({
-      company: input.company,
-      attendees: input.attendees,
-      meetingObjective: input.meetingObjective,
-      notes: input.notes
-    });
+    const result: ClientPrepPhase2Result = await generateClientPrepPhase2(
+      input.researchPacket,
+      input.phase1Markdown
+    );
 
     response.status(200).json(result);
   } catch (error) {

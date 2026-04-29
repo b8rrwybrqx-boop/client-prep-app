@@ -2,7 +2,11 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import { generateClientPrep } from "./app/api/generate-client-prep.js";
+import {
+  generateClientPrepPhase1,
+  generateClientPrepPhase2
+} from "./app/api/generate-client-prep.js";
+import type { ResearchPacket } from "./app/api/buildResearchPacket.js";
 
 const PORT = Number(process.env.PORT || 4173);
 const distRoot = fileURLToPath(new URL("./", import.meta.url));
@@ -39,7 +43,7 @@ async function readRequestBody(
   return Buffer.concat(chunks).toString("utf-8");
 }
 
-async function handleApiRequest(
+async function handlePhase1Request(
   request: import("node:http").IncomingMessage,
   response: import("node:http").ServerResponse
 ): Promise<void> {
@@ -64,12 +68,48 @@ async function handleApiRequest(
       return;
     }
 
-    const result = await generateClientPrep({
+    const result = await generateClientPrepPhase1({
       company: input.company,
       attendees: input.attendees,
       meetingObjective: input.meetingObjective,
       notes: input.notes
     });
+
+    sendJson(response, 200, result);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unexpected server error.";
+    sendJson(response, 500, { error: message });
+  }
+}
+
+async function handlePhase2Request(
+  request: import("node:http").IncomingMessage,
+  response: import("node:http").ServerResponse
+): Promise<void> {
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Method not allowed." });
+    return;
+  }
+
+  try {
+    const rawBody = await readRequestBody(request);
+    const input = JSON.parse(rawBody) as {
+      researchPacket?: ResearchPacket;
+      phase1Markdown?: string;
+    };
+
+    if (!input.researchPacket || !input.phase1Markdown?.trim()) {
+      sendJson(response, 400, {
+        error: "researchPacket and phase1Markdown are required."
+      });
+      return;
+    }
+
+    const result = await generateClientPrepPhase2(
+      input.researchPacket,
+      input.phase1Markdown
+    );
 
     sendJson(response, 200, result);
   } catch (error) {
@@ -106,7 +146,12 @@ createServer(async (request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host}`);
 
   if (url.pathname === "/api/generate-client-prep") {
-    await handleApiRequest(request, response);
+    await handlePhase1Request(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/generate-client-prep-phase-2") {
+    await handlePhase2Request(request, response);
     return;
   }
 

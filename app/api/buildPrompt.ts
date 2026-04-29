@@ -1,12 +1,55 @@
 import { readFile } from "node:fs/promises";
 import type { ResearchPacket } from "./buildResearchPacket.js";
 
+export type GenerationPhase = "phase1" | "phase2";
+
 export interface PromptPayload {
   systemPrompt: string;
   template: string;
   examples: string[];
   researchPacket: ResearchPacket;
   inputText: string;
+}
+
+const PHASE_1_SECTION_LABELS = [
+  "Company Snapshot",
+  "Competitive Context",
+  "Macro Industry / Ecosystem",
+  "Category / Segment Context",
+  "Stakeholder Context",
+  "Likely Priorities / Implications"
+];
+
+const PHASE_2_SECTION_LABELS = [
+  "Where TPG May Have a Credible Angle",
+  "Good Questions to Ask",
+  "Suggested Meeting Posture"
+];
+
+function buildPhaseDirective(
+  phase: GenerationPhase,
+  phase1Markdown?: string
+): string {
+  if (phase === "phase1") {
+    return [
+      "OUTPUT SCOPE — PHASE 1 OF 2:",
+      "- Begin with the title line and (if applicable) one short assumption note.",
+      `- Then output ONLY these sections, in this order: ${PHASE_1_SECTION_LABELS.join(", ")}.`,
+      "- Do NOT output 'Where TPG May Have a Credible Angle', 'Good Questions to Ask', or 'Suggested Meeting Posture'. A separate phase will produce those.",
+      "- Do NOT output a Sources section; sources will be appended after the second phase."
+    ].join("\n");
+  }
+
+  return [
+    "OUTPUT SCOPE — PHASE 2 OF 2:",
+    `- Output ONLY these sections, in this order: ${PHASE_2_SECTION_LABELS.join(", ")}.`,
+    "- Do NOT output the title line, the assumption note, or any Phase 1 sections. Phase 1 already produced those.",
+    "- Use the Phase 1 brief (provided below) for tone, terminology, and to reference its competitive and stakeholder framing where relevant.",
+    "- Do NOT output a Sources section; sources will be appended after this phase.",
+    "",
+    "PHASE 1 BRIEF (reference only — do not repeat its sections):",
+    phase1Markdown?.trim() ?? ""
+  ].join("\n");
 }
 
 async function loadText(relativePath: string): Promise<string> {
@@ -73,8 +116,10 @@ function buildPromptResearchPacket(
 }
 
 export async function buildPrompt(
-  researchPacket: ResearchPacket
+  researchPacket: ResearchPacket,
+  options: { phase?: GenerationPhase; phase1Markdown?: string } = {}
 ): Promise<PromptPayload> {
+  const phase = options.phase ?? "phase1";
   const isVercel = process.env.VERCEL === "1";
   const [systemPrompt, templatePrompt, ...exampleResults] = await Promise.all([
     loadText("../../prompts/system.txt"),
@@ -122,8 +167,11 @@ export async function buildPrompt(
         ].join("\n")
       : "";
 
+  const phaseDirective = buildPhaseDirective(phase, options.phase1Markdown);
+
   const inputText = [
     "Use the following materials to generate a client prep brief in markdown.",
+    phaseDirective,
     generationRefinements,
     attendeeInstructions,
     "",
