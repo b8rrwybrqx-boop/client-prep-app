@@ -146,24 +146,20 @@ export async function buildPrompt(
   const attendeeInstructions =
     researchPacket.input.attendees.length > 0
       ? [
-          "Attendee verification instructions:",
-          `- Attendees to verify: ${researchPacket.input.attendees.join(", ")}`,
+          "Stakeholder Context section instructions:",
+          `- Attendees to write up: ${researchPacket.input.attendees.join(", ")}`,
           `- Company to cross-reference: ${researchPacket.input.company}`,
-          "- Check company leadership pages first.",
-          "- Then check company-owned newsroom / press / investor pages for the attendee name.",
-          "- Only after that should you use secondary public-profile evidence and employee/profile directories.",
-          "- Use sourceType, confidence, verifiedTitle, verifiedRole, background, note, and inferredPriorities from the research packet.",
-          "- If secondarySignals are present, use them to summarize weak public evidence in plain language, for example: 'Publicly indexed sources tie [name] to [function]. One older directory-style source lists [title A]; another newer source lists [title B]. Current title should be treated as unconfirmed.'",
-          "- If sourceType is company-page or company-news, present the title/role as verified company-owned-source information.",
-          "- If sourceType is secondary-profile, phrase it clearly as secondary evidence, for example: 'Secondary public-profile sources suggest [title]'.",
-          "- Do not echo raw field names like sourceType or confidence in the final brief.",
-          "- If an attendee appears on a company-owned page but no clear title is captured, say that briefly in plain language, for example: 'Company-owned leadership page match found; title not listed on the accessible page.'",
-          "- If sourceType is not-found but secondarySignals are empty, it is fine to say that no clear attendee/company match was found on company-owned or secondary public sources.",
-          "- If sourceType is not-found, keep the stakeholder section useful by using inferredPriorities and a brief note instead of over-indexing on caveats.",
-          "- If named attendee verification is incomplete, add a short leadership fallback using 2-4 relevant named executives from companyFacts.leadership.",
-          "- Leadership fallback should prefer CEO, CFO, COO, CMO, President, or divisional presidents when available.",
-          "- Label that fallback clearly as company leadership context or additional leadership; do not imply those executives are confirmed meeting attendees.",
-          "- Keep the attendee block short. One verified note, one background note if available, and one or two interpretation bullets are enough."
+          "- For each attendee, write a tight block of label-first bullets. Default labels: **Verified:**, **Background:**, **Likely Priorities:**, **Likely Lens:**.",
+          "- If the brief includes more than one attendee, give each their own ### sub-heading using the attendee's name.",
+          "- VERIFIED line: state the attendee's title and remit in one sentence. If the title comes from a company-owned page (sourceType company-page or company-news), present it as verified.",
+          "- If the title was sourced via OpenAI web search, treat any company-owned domain (press release on the company's own corporate or investor site) as verified. Cite the source briefly inline, e.g. 'per 8/4/2025 PetSmart corporate press release'.",
+          "- If only directory or aggregator evidence is available (sourceType secondary-profile, no company-owned URL), phrase the title as 'reported by secondary public sources' and note that current title should be treated as unconfirmed.",
+          "- If sourceType is not-found and there are no secondarySignals, say no clear attendee/company match was found and keep the section useful via inferredPriorities.",
+          "- BACKGROUND line: synthesize the strongest 1-2 facts from `background`, `secondarySignals`, and `notes`. Combine into one sentence in your own words. Do NOT paste raw signals verbatim. Do NOT repeat the same fact more than once even if it appears in multiple signals.",
+          "- LIKELY PRIORITIES / LENS lines: be specific to this attendee's actual remit, not the rule-based defaults. If the packet shows their remit covers, e.g., proprietary brands and merchandising, the priorities should reflect that — not generic CCO talking points.",
+          "- Do not echo raw field names like sourceType, confidence, verificationLevel, or verificationLevel in the prose.",
+          "- Keep each attendee block to 4-5 bullets. If something is unverified, say so briefly and move on.",
+          "- If named attendee verification is fully unavailable, add a short leadership fallback using 2-4 relevant named executives from companyFacts.leadership under a clearly labelled '### Additional Leadership Context' subheading. Do not imply those executives are confirmed meeting attendees."
         ].join("\n")
       : "";
 

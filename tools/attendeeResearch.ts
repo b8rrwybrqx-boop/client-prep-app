@@ -153,27 +153,69 @@ function inferPriorities(title: string | null, company?: string): string[] {
   return unique(priorities);
 }
 
+function normalizeSignalForDedup(signal: string): string {
+  return signal
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[^\w\s]/g, "")
+    .trim();
+}
+
+function dedupNearDuplicateSignals(signals: string[]): string[] {
+  const result: string[] = [];
+  const fingerprints: string[] = [];
+
+  for (const signal of signals) {
+    const normalized = normalizeSignalForDedup(signal);
+
+    if (!normalized) {
+      continue;
+    }
+
+    const prefix = normalized.slice(0, 80);
+    const isDuplicate = fingerprints.some(
+      (existing) =>
+        existing === normalized ||
+        existing.startsWith(prefix) ||
+        normalized.startsWith(existing.slice(0, 80))
+    );
+
+    if (isDuplicate) {
+      continue;
+    }
+
+    fingerprints.push(normalized);
+    result.push(signal);
+  }
+
+  return result;
+}
+
 function summarizeSecondarySignals(matches: Array<{
   source: string;
   title?: string;
   background?: string;
   location?: string;
 }>): string[] {
-  return unique(
-    matches
-      .map((match) => {
-        const details = [match.title, match.background, match.location]
-          .filter(Boolean)
-          .join("; ");
+  const formatted = matches
+    .map((match) => {
+      const parts = Array.from(
+        new Set(
+          [match.title, match.background, match.location].filter(
+            (value): value is string => Boolean(value)
+          )
+        )
+      );
 
-        if (!details) {
-          return "";
-        }
+      if (parts.length === 0) {
+        return "";
+      }
 
-        return `${match.source}: ${details}`;
-      })
-      .filter(Boolean)
-  ).slice(0, 4);
+      return `${match.source}: ${parts.join("; ")}`;
+    })
+    .filter(Boolean);
+
+  return dedupNearDuplicateSignals(unique(formatted)).slice(0, 4);
 }
 
 interface OpenAiAttendeeSearchResult {
