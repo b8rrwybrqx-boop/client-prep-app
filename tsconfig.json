@@ -13,5 +13,5 @@
     "lib": ["DOM", "ES2022"],
     "types": ["node"]
   },
-  "include": ["api/**/*.ts", "app/**/*.ts", "tools/**/*.ts", "server.ts"]
+  "include": ["api/**/*.ts", "app/**/*.ts", "tools/**/*.ts", "scripts/**/*.ts", "server.ts"]
 }
