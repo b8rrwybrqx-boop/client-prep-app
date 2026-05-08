@@ -1,84 +1,8 @@
-import { searchWithOpenAiWeb } from "../app/api/openaiClient.js";
-import { searchWithAnthropicWeb } from "../app/api/anthropicClient.js";
-
-interface PromptVariant {
-  label: string;
-  build: (name: string, company: string, title?: string) => string;
-}
-
-// These prompts are copied verbatim from tools/attendeeResearch.ts so the
-// comparison reflects exactly what the live code asks each provider.
-const VARIANTS: PromptVariant[] = [
-  {
-    label: "generic",
-    build: (name, company) =>
-      [
-        `Find public indexed information for attendee "${name}" at company "${company}".`,
-        "Return up to two likely traces with current or recent title/function if available.",
-        "If titles conflict, include both and say current title is unconfirmed.",
-        "Focus on marketing, brand, innovation, sales, commercial, finance, operations, or leadership clues.",
-        "Format:",
-        "1. [source summary]",
-        "2. [source summary]"
-      ].join("\n")
-  },
-  {
-    label: "broaden",
-    build: (name, company) =>
-      [
-        `Find any public indexed reference connecting "${name}" with "${company}", its parent or subsidiaries, or any of its known brands.`,
-        "Be thorough. Consider: LinkedIn profiles (current or past), press releases, conference speaker lists, podcast appearances, trade publications, brand-specific announcements, patent or regulatory filings, and quoted commentary.",
-        "Allow for nickname / full-name pairs (Mike↔Michael, Bill↔William, Jimmy↔James, Liz↔Elizabeth), alternate spellings, and alternate publishing names.",
-        "If multiple plausible candidates exist, return up to two with brief reasoning about how each connects to the company.",
-        "Only declare 'no match' after considering brand-team and subsidiary roles, not just corporate-level positions.",
-        "Format:",
-        "1. [signal summary]",
-        "2. [signal summary]"
-      ].join("\n")
-  },
-  {
-    label: "title-aware",
-    build: (name, company, title) =>
-      [
-        `Find recent public information about "${name}", ${title ?? "[TITLE]"} at "${company}".`,
-        "Prefer the last 24 months: quotes in articles, conference talks, podcast appearances, press releases, notable initiatives, or strategic priorities they have spoken to.",
-        "Return up to two concise bullets summarizing distinct signals.",
-        "Format:",
-        "1. [signal summary]",
-        "2. [signal summary]"
-      ].join("\n")
-  }
-];
-
-interface ProviderResult {
-  outputText: string;
-  citations: Array<{ url: string; title?: string }>;
-  latencyMs: number;
-  error?: string;
-  model?: string;
-}
-
-async function timed<T extends { outputText: string; citations: Array<{ url: string; title?: string }>; model?: string }>(
-  call: () => Promise<T>
-): Promise<ProviderResult> {
-  const start = Date.now();
-  try {
-    const result = await call();
-    return {
-      outputText: result.outputText,
-      citations: result.citations,
-      latencyMs: Date.now() - start,
-      model: result.model
-    };
-  } catch (error) {
-    return {
-      outputText: "",
-      citations: [],
-      latencyMs: Date.now() - start,
-      error: error instanceof Error ? error.message : String(error)
-    };
-  }
-}
+import {
+  compareAttendeeSearch,
+  type ProviderRunResult,
+  type VariantResult
+} from "../app/api/compareAttendeeSearch.js";
 
 function indent(text: string, prefix = "    "): string {
   if (!text) {
@@ -104,9 +28,13 @@ function formatCitations(
     .join("\n");
 }
 
-function printProviderBlock(name: string, result: ProviderResult): void {
+function printProviderBlock(label: string, result?: ProviderRunResult): void {
+  if (!result) {
+    return;
+  }
+
   const header =
-    `  [${name}]` +
+    `  [${label}]` +
     (result.model ? ` model=${result.model}` : "") +
     ` latency=${result.latencyMs}ms` +
     (result.error ? ` ERROR` : "");
@@ -123,29 +51,17 @@ function printProviderBlock(name: string, result: ProviderResult): void {
   console.log(formatCitations(result.citations));
 }
 
-async function runVariant(
-  variant: PromptVariant,
-  name: string,
-  company: string,
-  title: string | undefined
-): Promise<void> {
-  if (variant.label === "title-aware" && !title) {
-    console.log(`\n=== variant: ${variant.label} ===`);
-    console.log("  (skipped — pass a --title to run the title-aware variant)");
+function printVariant(variantResult: VariantResult): void {
+  console.log(`\n=== variant: ${variantResult.variant} ===`);
+
+  if (variantResult.skipped) {
+    console.log(`  (skipped — ${variantResult.skipped})`);
     return;
   }
 
-  const prompt = variant.build(name, company, title);
-  console.log(`\n=== variant: ${variant.label} ===`);
-  console.log(indent(prompt, "  > "));
-
-  const [openai, anthropic] = await Promise.all([
-    timed(() => searchWithOpenAiWeb(prompt).then((r) => ({ ...r, model: undefined }))),
-    timed(() => searchWithAnthropicWeb(prompt))
-  ]);
-
-  printProviderBlock("OpenAI", openai);
-  printProviderBlock("Anthropic", anthropic);
+  console.log(indent(variantResult.prompt, "  > "));
+  printProviderBlock("OpenAI", variantResult.openai);
+  printProviderBlock("Anthropic", variantResult.anthropic);
 }
 
 interface CliArgs {
@@ -191,8 +107,9 @@ async function main(): Promise<void> {
     console.log(`Title hint: ${title}`);
   }
 
-  for (const variant of VARIANTS) {
-    await runVariant(variant, name, company, title);
+  const result = await compareAttendeeSearch(name, company, title);
+  for (const variant of result.variants) {
+    printVariant(variant);
   }
 
   console.log("\nDone.");

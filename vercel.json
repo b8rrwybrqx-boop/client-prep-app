@@ -7,6 +7,9 @@
     "api/generate-client-prep-phase-2.ts": {
       "maxDuration": 300,
       "includeFiles": "prompts/**"
+    },
+    "api/compare-attendee-search.ts": {
+      "maxDuration": 120
     }
   }
 }
